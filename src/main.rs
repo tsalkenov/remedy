@@ -45,12 +45,13 @@ fn main() -> anyhow::Result<()> {
 
         
             ONCE.call_once(|| {
-                log::info!("multiplier: {multiplier}");
-                log::info!("term: {term_width} {term_height}");
-                log::info!("news: {new_width} {new_height}");
+                log::info!("---SIZES---");
+                log::info!("term: {term_width}x{term_height}");
+                log::info!("img: {}x{}", buffer.width(), buffer.height());
+                log::info!("output: {new_width}x{new_height}");
             });
 
-            resize(buffer, new_height, new_width, FilterType::Lanczos3)
+            resize(buffer, new_width, new_height, FilterType::Lanczos3)
                 .rows()
                 .map(|row| {
                     row.into_iter()
