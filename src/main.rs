@@ -43,6 +43,7 @@ fn main() -> anyhow::Result<()> {
             let new_height = (buffer.height() as f32 * multiplier).ceil() as u32;
             let new_width = (buffer.width() as f32 * multiplier).ceil() as u32;
 
+        
             ONCE.call_once(|| {
                 log::info!("multiplier: {multiplier}");
                 log::info!("term: {term_width} {term_height}");
@@ -99,7 +100,7 @@ fn recieve_path() -> io::Result<PathBuf> {
     }
     let extension = target_file.extension().and_then(OsStr::to_str).unwrap_or("");
 
-    if extension == "gif" {
+    if extension != "gif" {
         log::error!("bruh file no good way encode");
         std::process::exit(1);
     }
