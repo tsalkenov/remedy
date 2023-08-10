@@ -1,11 +1,12 @@
 // #![allow(unused)]
 
 use std::ffi::OsStr;
+use std::fs;
 use std::io::{self, Write};
 use std::iter::repeat;
 use std::path::PathBuf;
 use std::sync::Once;
-use std::fs;
+use std::time::Duration;
 
 use clap::Parser;
 use colored::Colorize;
@@ -22,12 +23,12 @@ use image::{AnimationDecoder, Rgba};
 struct Cli {
     /// Name of gif file to play
     target_file: PathBuf,
-    /// Charachter representing one cell of image
-    #[arg(short, long, default_value_t='0')]
+    /// Character representing one cell of the image
+    #[arg(short, long, default_value_t = '0')]
     char: char,
     /// Toggle debug information logging
     #[arg(short, long)]
-    debug: bool
+    debug: bool,
 }
 
 static ONCE: Once = Once::new();
@@ -45,21 +46,38 @@ fn main() -> anyhow::Result<()> {
     }
     let extension = target_path.extension().and_then(OsStr::to_str).unwrap_or("");
     if extension != "gif" {
-        log::error!("File has invalid extension. Provide a gif file");
+        log::error!("File has an invalid extension. Provide a gif file");
         std::process::exit(1);
     }
 
     let target_file = fs::File::open(target_path)?;
 
-    let decoder = GifDecoder::new(target_file)?;
-    let frames = decoder.into_frames();
-    let frames = frames.collect_frames()?;
+    let frames = load_frames(target_file)?;
     let delay = frames[0].delay();
 
-    let (term_width, term_height) = size()?;
+    let fitted_frames = fit_frames(cli.char, &frames, cli.debug)?;
 
-    let fitted_frames: Vec<String> = frames
-        .into_iter()
+    let mut stdout = io::stdout();
+
+    enable_raw_mode()?;
+    stdout.execute(EnterAlternateScreen)?;
+    play_animation(&mut stdout, &fitted_frames, delay.into())?;
+    disable_raw_mode()?;
+    stdout.execute(LeaveAlternateScreen)?;
+
+    Ok(())
+}
+
+fn load_frames<T: std::io::Read>(input: T) -> anyhow::Result<Vec<image::Frame>> {
+    let decoder = GifDecoder::new(input)?;
+    let frames = decoder.into_frames().collect_frames()?;
+    Ok(frames)
+}
+
+fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Result<Vec<String>> {
+    let (term_width, term_height) = size()?;
+    Ok(frames
+        .iter()
         .map(|frame| {
             let buffer = frame.buffer();
 
@@ -68,12 +86,12 @@ fn main() -> anyhow::Result<()> {
             let new_width = (buffer.width() as f32 * multiplier).ceil() as u32;
             let padding = (term_width as u32 - new_width) / 2;
 
-            if cli.debug {
+            if debug {
                 ONCE.call_once(|| {
                     log::info!("---SIZES---");
-                    log::info!("term: {term_width}x{term_height}");
+                    log::info!("term: {}x{}", term_width, term_height);
                     log::info!("img: {}x{}", buffer.width(), buffer.height());
-                    log::info!("output: {new_width}x{new_height}");
+                    log::info!("output: {}x{}", new_width, new_height);
                 });
             }
 
@@ -83,23 +101,20 @@ fn main() -> anyhow::Result<()> {
                     " ".repeat(padding as usize)
                         + &row
                             .into_iter()
-                            .map(|Rgba([r, g, b, _])| cli.char.to_string().truecolor(*r, *g, *b).to_string())
+                            .map(|Rgba([r, g, b, _])| char.to_string().truecolor(*r, *g, *b).to_string())
                             .collect::<String>()
                         + "\n\r"
                 })
                 .collect::<String>()
         })
-        .collect();
+        .collect())
+}
 
-    let mut stdout = io::stdout();
-
-    enable_raw_mode()?;
-    stdout.execute(EnterAlternateScreen)?;
-
-    for frame in repeat(fitted_frames).flat_map(|x| x.into_iter()) {
+fn play_animation(stdout: &mut io::Stdout, frames: &[String], delay: Duration) -> io::Result<()> {
+    for frame in repeat(frames).flat_map(|x| x.iter()) {
         stdout.execute(Clear(ClearType::All))?;
         write!(stdout, "{}", frame)?;
-        if poll(delay.into())? {
+        if poll(delay)? {
             if let Event::Key(k) = read()? {
                 if let crossterm::event::KeyCode::Char('q') = k.code {
                     break;
@@ -107,9 +122,5 @@ fn main() -> anyhow::Result<()> {
             }
         }
     }
-
-    disable_raw_mode()?;
-    stdout.execute(LeaveAlternateScreen)?;
-
     Ok(())
 }
