@@ -26,7 +26,7 @@ struct Cli {
     /// Name of gif file to play
     target_file: PathBuf,
     /// Character representing one cell of the image
-    #[arg(short, long, default_value_t = '0')]
+    #[arg(short, long, default_value_t = '█')]
     char: char,
     /// Toggle debug information logging
     #[arg(short, long)]
@@ -87,9 +87,9 @@ fn fit_frames(char: char, frames: Vec<image::Frame>, debug: bool) -> anyhow::Res
 
             let multiplier: f32 =
                 (term_width as f32 / (buffer.width() * 2) as f32).min(term_height as f32 / buffer.height() as f32);
-            let new_height = (buffer.height() as f32 * multiplier).ceil() as u32;
-            let new_width = (buffer.width() as f32 * multiplier).ceil() as u32 * 2;
-            let padding = (term_width as u32 - new_width) / 2;
+            let new_height = (buffer.height() as f32 * multiplier).round() as u32;
+            let new_width = (buffer.width() as f32 * multiplier).floor() as u32 * 2;
+            let padding = ((term_width as u32 - new_width) as f32 / 2f32).ceil() as u32;
 
             if debug {
                 ONCE.call_once(|| {
@@ -131,12 +131,4 @@ fn play_animation(stdout: &mut io::Stdout, frames: Vec<String>, delay: Duration)
         std::thread::sleep(delay - timer.elapsed());
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    // #[bench]
-    // fn () {
-    //
-    // }
 }
