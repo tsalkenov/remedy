@@ -89,7 +89,6 @@ fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Resul
                 (term_width as f32 / (buffer.width() * 2) as f32).min(term_height as f32 / buffer.height() as f32);
             let new_height = (buffer.height() as f32 * multiplier).ceil() as u32;
             let new_width = (buffer.width() as f32 * multiplier).ceil() as u32 * 2;
-            log::info!("{new_width}  {term_width}");
             let padding = (term_width as u32 - new_width) / 2;
 
             if debug {
