@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use std::iter::repeat;
 use std::path::PathBuf;
 use std::sync::Once;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use clap::Parser;
 use colored::Colorize;
@@ -14,7 +14,7 @@ use crossterm::event::{poll, read, Event};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, size, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use crossterm::ExecutableCommand;
+use crossterm::{ExecutableCommand, QueueableCommand};
 use image::codecs::gif::GifDecoder;
 use image::imageops::{resize, FilterType};
 use image::{AnimationDecoder, Rgba};
@@ -83,12 +83,13 @@ fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Resul
 
             let multiplier: f32 = (term_width as f32 / buffer.width() as f32).min(term_height as f32 / buffer.height() as f32);
             let new_height = (buffer.height() as f32 * multiplier).ceil() as u32;
-            let new_width = (buffer.width() as f32 * multiplier).ceil() as u32;
+            let new_width = (buffer.width() as f32 * multiplier).ceil() as u32 * 2;
             let padding = (term_width as u32 - new_width) / 2;
 
             if debug {
                 ONCE.call_once(|| {
                     log::info!("---SIZES---");
+                    log::info!("{multiplier}");
                     log::info!("term: {}x{}", term_width, term_height);
                     log::info!("img: {}x{}", buffer.width(), buffer.height());
                     log::info!("output: {}x{}", new_width, new_height);
@@ -98,29 +99,40 @@ fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Resul
             resize(buffer, new_width, new_height, FilterType::Lanczos3)
                 .rows()
                 .map(|row| {
-                    " ".repeat(padding as usize)
+                    "\r\n".to_string()
+                        + &" ".repeat(padding as usize)
                         + &row
                             .into_iter()
                             .map(|Rgba([r, g, b, _])| char.to_string().truecolor(*r, *g, *b).to_string())
                             .collect::<String>()
-                        + "\n\r"
                 })
-                .collect::<String>()
+                .collect::<Vec<String>>()
+                .join("")
         })
         .collect())
 }
 
 fn play_animation(stdout: &mut io::Stdout, frames: &[String], delay: Duration) -> io::Result<()> {
     for frame in repeat(frames).flat_map(|x| x.iter()) {
-        stdout.execute(Clear(ClearType::All))?;
+        stdout.queue(Clear(ClearType::All))?;
+        let timer = Instant::now();
         write!(stdout, "{}", frame)?;
-        if poll(delay)? {
+        if poll(Duration::from_millis(1))? {
             if let Event::Key(k) = read()? {
                 if let crossterm::event::KeyCode::Char('q') = k.code {
                     break;
                 }
             }
         }
+        std::thread::sleep(delay - timer.elapsed());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    // #[bench]
+    // fn () {
+    //
+    // }
 }
