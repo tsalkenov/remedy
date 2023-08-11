@@ -18,6 +18,8 @@ use crossterm::{ExecutableCommand, QueueableCommand};
 use image::codecs::gif::GifDecoder;
 use image::imageops::{resize, FilterType};
 use image::{AnimationDecoder, Rgba};
+use rayon::iter::ParallelIterator;
+use rayon::prelude::IntoParallelRefIterator;
 
 #[derive(Parser)]
 struct Cli {
@@ -59,11 +61,13 @@ fn main() -> anyhow::Result<()> {
 
     let mut stdout = io::stdout();
 
-    enable_raw_mode()?;
-    stdout.execute(EnterAlternateScreen)?;
-    play_animation(&mut stdout, &fitted_frames, delay.into())?;
-    disable_raw_mode()?;
-    stdout.execute(LeaveAlternateScreen)?;
+    if !cli.debug {
+        enable_raw_mode()?;
+        stdout.execute(EnterAlternateScreen)?;
+        play_animation(&mut stdout, &fitted_frames, delay.into())?;
+        disable_raw_mode()?;
+        stdout.execute(LeaveAlternateScreen)?;
+    }
 
     Ok(())
 }
@@ -77,13 +81,15 @@ fn load_frames<T: std::io::Read>(input: T) -> anyhow::Result<Vec<image::Frame>> 
 fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Result<Vec<String>> {
     let (term_width, term_height) = size()?;
     Ok(frames
-        .iter()
+        .par_iter()
         .map(|frame| {
             let buffer = frame.buffer();
 
-            let multiplier: f32 = (term_width as f32 / buffer.width() as f32).min(term_height as f32 / buffer.height() as f32);
+            let multiplier: f32 =
+                (term_width as f32 / (buffer.width() * 2) as f32).min(term_height as f32 / buffer.height() as f32);
             let new_height = (buffer.height() as f32 * multiplier).ceil() as u32;
             let new_width = (buffer.width() as f32 * multiplier).ceil() as u32 * 2;
+            log::info!("{new_width}  {term_width}");
             let padding = (term_width as u32 - new_width) / 2;
 
             if debug {
@@ -99,10 +105,9 @@ fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Resul
             resize(buffer, new_width, new_height, FilterType::Lanczos3)
                 .rows()
                 .map(|row| {
-                    "\r\n".to_string()
+                    "\n\r".to_string()
                         + &" ".repeat(padding as usize)
                         + &row
-                            .into_iter()
                             .map(|Rgba([r, g, b, _])| char.to_string().truecolor(*r, *g, *b).to_string())
                             .collect::<String>()
                 })

@@ -770,6 +770,7 @@ dependencies = [
  "image",
  "log",
  "pretty_env_logger",
+ "rayon",
 ]
 
 [[package]]

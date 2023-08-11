@@ -13,6 +13,7 @@ clap = { version = "4.3.21", features = ["derive"] }
 log = "0.4.19"
 pretty_env_logger = "0.5.0"
 anyhow = "1.0.72"
+rayon = "1.7.0"
 
 [profile.dev]
 opt-level = 3
