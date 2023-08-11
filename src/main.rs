@@ -26,7 +26,7 @@ struct Cli {
     /// Name of gif file to play
     target_file: PathBuf,
     /// Character representing one cell of the image
-    #[arg(short, long, default_value_t = '█')]
+    #[arg(short, long, default_value_t = '0')]
     char: char,
     /// Toggle debug information logging
     #[arg(short, long)]
