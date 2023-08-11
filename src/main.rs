@@ -57,14 +57,14 @@ fn main() -> anyhow::Result<()> {
     let frames = load_frames(target_file)?;
     let delay = frames[0].delay();
 
-    let fitted_frames = fit_frames(cli.char, &frames, cli.debug)?;
+    let fitted_frames = fit_frames(cli.char, frames, cli.debug)?;
 
     let mut stdout = io::stdout();
 
     if !cli.debug {
         enable_raw_mode()?;
         stdout.execute(EnterAlternateScreen)?;
-        play_animation(&mut stdout, &fitted_frames, delay.into())?;
+        play_animation(&mut stdout, fitted_frames, delay.into())?;
         disable_raw_mode()?;
         stdout.execute(LeaveAlternateScreen)?;
     }
@@ -78,7 +78,7 @@ fn load_frames<T: std::io::Read>(input: T) -> anyhow::Result<Vec<image::Frame>> 
     Ok(frames)
 }
 
-fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Result<Vec<String>> {
+fn fit_frames(char: char, frames: Vec<image::Frame>, debug: bool) -> anyhow::Result<Vec<String>> {
     let (term_width, term_height) = size()?;
     Ok(frames
         .par_iter()
@@ -116,9 +116,9 @@ fn fit_frames(char: char, frames: &[image::Frame], debug: bool) -> anyhow::Resul
         .collect())
 }
 
-fn play_animation(stdout: &mut io::Stdout, frames: &[String], delay: Duration) -> io::Result<()> {
-    for frame in repeat(frames).flat_map(|x| x.iter()) {
-        stdout.queue(Clear(ClearType::All))?;
+fn play_animation(stdout: &mut io::Stdout, frames: Vec<String>, delay: Duration) -> io::Result<()> {
+    for frame in repeat(frames).flat_map(|x| x.into_iter()) {
+        stdout.queue(Clear(ClearType::FromCursorDown))?;
         let timer = Instant::now();
         write!(stdout, "{}", frame)?;
         if poll(Duration::from_millis(1))? {
