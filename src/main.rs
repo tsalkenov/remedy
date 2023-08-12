@@ -93,7 +93,6 @@ fn fit_frames(char: char, frames: Vec<image::Frame>, debug: bool) -> anyhow::Res
 
             if debug {
                 ONCE.call_once(|| {
-                    log::info!("---SIZES---");
                     log::info!("multiplier: {multiplier}");
                     log::info!("term: {term_width}x{term_height}");
                     log::info!("img: {}x{}", buffer.width(), buffer.height());
